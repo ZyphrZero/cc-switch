@@ -640,6 +640,26 @@ export const tauriAPI = {
     });
     return unlisten;
   },
+
+  // 获取 app_config_dir 覆盖配置(从 Store)
+  getAppConfigDirOverride: async (): Promise<string | null> => {
+    try {
+      return await invoke<string | null>("get_app_config_dir_override");
+    } catch (error) {
+      console.error("获取 app_config_dir 覆盖配置失败:", error);
+      return null;
+    }
+  },
+
+  // 设置 app_config_dir 覆盖配置(到 Store)
+  setAppConfigDirOverride: async (path: string | null): Promise<boolean> => {
+    try {
+      return await invoke<boolean>("set_app_config_dir_override", { path });
+    } catch (error) {
+      console.error("设置 app_config_dir 覆盖配置失败:", error);
+      throw error;
+    }
+  },
 };
 
 // 创建全局 API 对象，兼容现有代码

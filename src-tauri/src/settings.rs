@@ -26,8 +26,6 @@ pub struct AppSettings {
     #[serde(default)]
     pub enable_claude_plugin_integration: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub app_config_dir: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub claude_config_dir: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub codex_config_dir: Option<String>,
@@ -55,7 +53,6 @@ impl Default for AppSettings {
             show_in_tray: true,
             minimize_to_tray_on_close: true,
             enable_claude_plugin_integration: false,
-            app_config_dir: None,
             claude_config_dir: None,
             codex_config_dir: None,
             language: None,
@@ -76,13 +73,6 @@ impl AppSettings {
     }
 
     fn normalize_paths(&mut self) {
-        self.app_config_dir = self
-            .app_config_dir
-            .as_ref()
-            .map(|s| s.trim())
-            .filter(|s| !s.is_empty())
-            .map(|s| s.to_string());
-
         self.claude_config_dir = self
             .claude_config_dir
             .as_ref()
@@ -191,14 +181,6 @@ pub fn get_codex_override_dir() -> Option<PathBuf> {
     let settings = settings_store().read().ok()?;
     settings
         .codex_config_dir
-        .as_ref()
-        .map(|p| resolve_override_path(p))
-}
-
-pub fn get_app_config_override_dir() -> Option<PathBuf> {
-    let settings = settings_store().read().ok()?;
-    settings
-        .app_config_dir
         .as_ref()
         .map(|p| resolve_override_path(p))
 }

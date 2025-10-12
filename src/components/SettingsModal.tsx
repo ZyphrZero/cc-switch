@@ -57,11 +57,14 @@ export default function SettingsModal({
     showInTray: true,
     minimizeToTrayOnClose: true,
     enableClaudePluginIntegration: false,
-    appConfigDir: undefined,
     claudeConfigDir: undefined,
     codexConfigDir: undefined,
     language: persistedLanguage,
   });
+  // appConfigDir 现在从 Store 独立管理
+  const [appConfigDir, setAppConfigDir] = useState<string | undefined>(
+    undefined,
+  );
   const [initialLanguage, setInitialLanguage] = useState<"zh" | "en">(
     persistedLanguage,
   );
@@ -92,6 +95,7 @@ export default function SettingsModal({
 
   useEffect(() => {
     loadSettings();
+    loadAppConfigDirFromStore(); // 从 Store 加载 appConfigDir
     loadConfigPath();
     loadVersion();
     loadResolvedDirs();
@@ -106,6 +110,24 @@ export default function SettingsModal({
       console.error(t("console.getVersionFailed"), error);
       // 失败时不硬编码版本号，显示为未知
       setVersion(t("common.unknown"));
+    }
+  };
+
+  // 从 Tauri Store 加载 appConfigDir
+  const loadAppConfigDirFromStore = async () => {
+    try {
+      const storeValue = await (window as any).api.getAppConfigDirOverride();
+      if (storeValue) {
+        setAppConfigDir(storeValue);
+        setInitialAppConfigDir(storeValue);
+        setResolvedAppConfigDir(storeValue);
+      } else {
+        // 使用默认值
+        const defaultDir = await computeDefaultAppConfigDir();
+        setResolvedAppConfigDir(defaultDir);
+      }
+    } catch (error) {
+      console.error("从 Store 加载 appConfigDir 失败:", error);
     }
   };
 
@@ -126,11 +148,6 @@ export default function SettingsModal({
           : persistedLanguage,
       );
 
-      const appConfigDir =
-        typeof (loadedSettings as any)?.appConfigDir === "string"
-          ? (loadedSettings as any).appConfigDir
-          : undefined;
-
       setSettings({
         showInTray,
         minimizeToTrayOnClose,
@@ -139,7 +156,6 @@ export default function SettingsModal({
           "boolean"
             ? (loadedSettings as any).enableClaudePluginIntegration
             : false,
-        appConfigDir,
         claudeConfigDir:
           typeof (loadedSettings as any)?.claudeConfigDir === "string"
             ? (loadedSettings as any).claudeConfigDir
@@ -151,7 +167,6 @@ export default function SettingsModal({
         language: storedLanguage,
       });
       setInitialLanguage(storedLanguage);
-      setInitialAppConfigDir(appConfigDir);
       if (i18n.language !== storedLanguage) {
         void i18n.changeLanguage(storedLanguage);
       }
@@ -198,10 +213,6 @@ export default function SettingsModal({
       const selectedLanguage = settings.language === "en" ? "en" : "zh";
       const payload: Settings = {
         ...settings,
-        appConfigDir:
-          settings.appConfigDir && settings.appConfigDir.trim() !== ""
-            ? settings.appConfigDir.trim()
-            : undefined,
         claudeConfigDir:
           settings.claudeConfigDir && settings.claudeConfigDir.trim() !== ""
             ? settings.claudeConfigDir.trim()
@@ -213,12 +224,15 @@ export default function SettingsModal({
         language: selectedLanguage,
       };
 
-      // 检测 appConfigDir 是否真正发生变化
-      const appConfigDirChanged =
-        (payload.appConfigDir || undefined) !==
-        (initialAppConfigDir || undefined);
-
+      // 保存 settings.json (不包含 appConfigDir)
       await window.api.saveSettings(payload);
+
+      // 单独保存 appConfigDir 到 Store
+      const normalizedAppConfigDir =
+        appConfigDir && appConfigDir.trim() !== ""
+          ? appConfigDir.trim()
+          : null;
+      await (window as any).api.setAppConfigDirOverride(normalizedAppConfigDir);
 
       // 立即生效：根据开关无条件写入/移除 ~/.claude/config.json
       try {
@@ -231,14 +245,19 @@ export default function SettingsModal({
         console.warn("[Settings] Apply Claude plugin config on save failed", e);
       }
 
+      // 检测 appConfigDir 是否真正发生变化
+      const appConfigDirChanged =
+        (normalizedAppConfigDir || undefined) !==
+        (initialAppConfigDir || undefined);
+
       setSettings(payload);
+      setInitialAppConfigDir(normalizedAppConfigDir ?? undefined);
       try {
         window.localStorage.setItem("language", selectedLanguage);
       } catch (error) {
         console.warn("[Settings] Failed to persist language preference", error);
       }
       setInitialLanguage(selectedLanguage);
-      setInitialAppConfigDir(payload.appConfigDir);
       if (i18n.language !== selectedLanguage) {
         void i18n.changeLanguage(selectedLanguage);
       }
@@ -361,7 +380,7 @@ export default function SettingsModal({
 
   const handleBrowseAppConfigDir = async () => {
     try {
-      const currentResolved = settings.appConfigDir ?? resolvedAppConfigDir;
+      const currentResolved = appConfigDir ?? resolvedAppConfigDir;
       const selected = await window.api.selectConfigDirectory(currentResolved);
 
       if (!selected) {
@@ -374,7 +393,7 @@ export default function SettingsModal({
         return;
       }
 
-      setSettings((prev) => ({ ...prev, appConfigDir: sanitized }));
+      setAppConfigDir(sanitized);
       setResolvedAppConfigDir(sanitized);
     } catch (error) {
       console.error(t("console.selectConfigDirFailed"), error);
@@ -434,7 +453,7 @@ export default function SettingsModal({
   };
 
   const handleResetAppConfigDir = async () => {
-    setSettings((prev) => ({ ...prev, appConfigDir: undefined }));
+    setAppConfigDir(undefined);
     const defaultDir = await computeDefaultAppConfigDir();
     if (defaultDir) {
       setResolvedAppConfigDir(defaultDir);
@@ -716,13 +735,8 @@ export default function SettingsModal({
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    value={settings.appConfigDir ?? resolvedAppConfigDir ?? ""}
-                    onChange={(e) =>
-                      setSettings({
-                        ...settings,
-                        appConfigDir: e.target.value,
-                      })
-                    }
+                    value={appConfigDir ?? resolvedAppConfigDir ?? ""}
+                    onChange={(e) => setAppConfigDir(e.target.value)}
                     placeholder={t("settings.browsePlaceholderApp")}
                     className="flex-1 px-3 py-2 text-xs font-mono bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/40"
                   />
