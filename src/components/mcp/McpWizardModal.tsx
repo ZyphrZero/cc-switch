@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { X, Save } from "lucide-react";
-import { McpServer } from "../../types";
+import { McpServerSpec } from "../../types";
 import { isLinux } from "../../lib/platform";
 
 interface McpWizardModalProps {
@@ -86,7 +86,7 @@ const McpWizardModal: React.FC<McpWizardModalProps> = ({
 
   // 生成预览 JSON
   const generatePreview = (): string => {
-    const config: McpServer = {
+    const config: McpServerSpec = {
       type: wizardType,
     };
 
@@ -227,7 +227,7 @@ const McpWizardModal: React.FC<McpWizardModalProps> = ({
                     className="w-4 h-4 text-emerald-500 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 focus:ring-emerald-500 dark:focus:ring-emerald-400 focus:ring-2"
                   />
                   <span className="text-sm text-gray-900 dark:text-gray-100">
-                    stdio
+                    {t("mcp.wizard.typeStdio")}
                   </span>
                 </label>
                 <label className="inline-flex items-center gap-2 cursor-pointer">
@@ -241,7 +241,7 @@ const McpWizardModal: React.FC<McpWizardModalProps> = ({
                     className="w-4 h-4 text-emerald-500 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 focus:ring-emerald-500 dark:focus:ring-emerald-400 focus:ring-2"
                   />
                   <span className="text-sm text-gray-900 dark:text-gray-100">
-                    http
+                    {t("mcp.wizard.typeHttp")}
                   </span>
                 </label>
               </div>

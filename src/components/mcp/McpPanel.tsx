@@ -5,7 +5,10 @@ import { McpServer } from "../../types";
 import McpListItem from "./McpListItem";
 import McpFormModal from "./McpFormModal";
 import { ConfirmDialog } from "../ConfirmDialog";
-import { extractErrorMessage } from "../../utils/errorUtils";
+import {
+  extractErrorMessage,
+  translateMcpBackendError,
+} from "../../utils/errorUtils";
 // 预设相关逻辑已迁移到“新增 MCP”面板，列表此处无需引用
 import { buttonStyles } from "../../lib/styles";
 import { AppType } from "../../lib/tauri-api";
@@ -89,10 +92,11 @@ const McpPanel: React.FC<McpPanelProps> = ({ onClose, onNotify, appType }) => {
       // 失败时回滚
       setServers(previousServers);
       const detail = extractErrorMessage(e);
+      const mapped = translateMcpBackendError(detail, t);
       onNotify?.(
-        detail || t("mcp.error.saveFailed"),
+        mapped || detail || t("mcp.error.saveFailed"),
         "error",
-        detail ? 6000 : 5000,
+        mapped || detail ? 6000 : 5000,
       );
     }
   };
@@ -120,10 +124,11 @@ const McpPanel: React.FC<McpPanelProps> = ({ onClose, onNotify, appType }) => {
           onNotify?.(t("mcp.msg.deleted"), "success", 1500);
         } catch (e: any) {
           const detail = extractErrorMessage(e);
+          const mapped = translateMcpBackendError(detail, t);
           onNotify?.(
-            detail || t("mcp.error.deleteFailed"),
+            mapped || detail || t("mcp.error.deleteFailed"),
             "error",
-            detail ? 6000 : 5000,
+            mapped || detail ? 6000 : 5000,
           );
         }
       },
@@ -132,17 +137,19 @@ const McpPanel: React.FC<McpPanelProps> = ({ onClose, onNotify, appType }) => {
 
   const handleSave = async (id: string, server: McpServer) => {
     try {
-      await window.api.upsertMcpServerInConfig(appType, id, server);
+      const payload: McpServer = { ...server, id };
+      await window.api.upsertMcpServerInConfig(appType, id, payload);
       await reload();
       setIsFormOpen(false);
       setEditingId(null);
       onNotify?.(t("mcp.msg.saved"), "success", 1500);
     } catch (e: any) {
       const detail = extractErrorMessage(e);
+      const mapped = translateMcpBackendError(detail, t);
       onNotify?.(
-        detail || t("mcp.error.saveFailed"),
+        mapped || detail || t("mcp.error.saveFailed"),
         "error",
-        detail ? 6000 : 5000,
+        mapped || detail ? 6000 : 5000,
       );
       // 继续抛出错误，让表单层可以给到直观反馈（避免被更高层遮挡）
       throw e;
@@ -154,7 +161,15 @@ const McpPanel: React.FC<McpPanelProps> = ({ onClose, onNotify, appType }) => {
     setEditingId(null);
   };
 
-  const serverEntries = useMemo(() => Object.entries(servers), [servers]);
+  const serverEntries = useMemo(
+    () => Object.entries(servers) as Array<[string, McpServer]>,
+    [servers],
+  );
+
+  const enabledCount = useMemo(
+    () => serverEntries.filter(([_, server]) => server.enabled).length,
+    [serverEntries],
+  );
 
   const panelTitle =
     appType === "claude" ? t("mcp.claudeTitle") : t("mcp.codexTitle");
@@ -195,7 +210,8 @@ const McpPanel: React.FC<McpPanelProps> = ({ onClose, onNotify, appType }) => {
         {/* Info Section */}
         <div className="flex-shrink-0 px-6 pt-4 pb-2">
           <div className="text-sm text-gray-500 dark:text-gray-400">
-            {t("mcp.serverCount", { count: Object.keys(servers).length })}
+            {t("mcp.serverCount", { count: Object.keys(servers).length })} ·{" "}
+            {t("mcp.enabledCount", { count: enabledCount })}
           </div>
         </div>
 
